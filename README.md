@@ -32,11 +32,11 @@ integration/    Testcontainers 容器黑盒测试
 
 ## 本地使用
 
-本地只需要预装 [mise](https://mise.jdx.dev/)。Go、Buf、sqlc、goose、Evans、Air、golangci-lint 和 govulncheck 均由 `.mise.toml` 固定版本，不需要单独用 Homebrew 或 `go install` 安装。Buf 代码生成插件由 BSR 远程执行，本机也不需要安装 `protoc-gen-go`。
+本地只需要预装 [mise](https://mise.jdx.dev/)。Go、Buf、sqlc、goose、Evans、Air、golangci-lint 和 govulncheck 均由 `.mise.toml` 固定版本，不需要单独用 Homebrew 或 `go install` 安装。项目为公开工具下载开启重试和两分钟超时；sqlc 与 govulncheck 使用 mise 的 Go backend，并固定公开的 `proxy.golang.org,direct` 和 Google checksum mirror，避免用户环境中的内部代理。Buf 代码生成插件由 BSR 远程执行，本机也不需要安装 `protoc-gen-go`。
 
 ```bash
 mise trust
-mise install
+mise install -j 1
 mise tasks ls
 mise run verify
 mise run run
@@ -75,6 +75,8 @@ buf curl --protocol grpc \
 ## 使用 Evans 调试 gRPC
 
 [Evans](https://github.com/ktr0731/evans) 是开源的 gRPC REPL。服务端已经启用 reflection，因此 Evans 能在运行时发现 package、service、message 和 RPC，无需编写临时 client 或手工指定 proto 文件。`mise install` 会安装项目固定的 Evans 版本。
+
+完整的服务发现、请求校验、创建用户、分页、服务端流和 Health 检查示例见 [`docs/evans-debugging.md`](docs/evans-debugging.md)。
 
 分别启动服务和 REPL：
 

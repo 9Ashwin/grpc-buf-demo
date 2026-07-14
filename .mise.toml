@@ -1,12 +1,20 @@
 [tools]
 go = "1.26.5"
 buf = "1.71.0"
-sqlc = "1.31.1"
 golangci-lint = "2.12.2"
 air = "1.65.3"
 evans = "0.10.11"
 "aqua:pressly/goose" = "3.27.2"
-"aqua:golang/vuln/govulncheck" = "1.6.0"
+"go:github.com/sqlc-dev/sqlc/cmd/sqlc" = { version = "v1.31.1", install_env = { GOPROXY = "https://proxy.golang.org,direct" } }
+"go:golang.org/x/vuln/cmd/govulncheck" = { version = "v1.1.4", install_env = { GOPROXY = "https://proxy.golang.org,direct" } }
+
+[settings]
+http_retries = 5
+http_timeout = "2m"
+
+[env]
+GOPROXY = "https://proxy.golang.org,direct"
+GOSUMDB = "sum.golang.org https://sum.golang.google.cn"
 
 [tasks.generate]
 description = "Generate protobuf, gRPC, gateway, OpenAPI, and database code"
