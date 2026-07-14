@@ -58,3 +58,7 @@ buf curl --protocol grpc \
 4. CI 再次生成代码；若 `gen/` 出现 diff，说明生成产物或插件版本未同步。
 
 示例将生成产物保存在同一仓库，便于直接运行和审阅。大型多语言项目可保持同样的 proto/CI 规则，再把各语言产物发布到独立 SDK 仓库或 BSR Generated SDK。
+
+## License
+
+本项目基于 [MIT License](LICENSE) 开源。
