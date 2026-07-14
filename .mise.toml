@@ -1,0 +1,68 @@
+[tools]
+go = "1.26.5"
+buf = "1.71.0"
+sqlc = "1.31.1"
+golangci-lint = "2.12.2"
+air = "1.65.3"
+evans = "0.10.11"
+"aqua:pressly/goose" = "3.27.2"
+"aqua:golang/vuln/govulncheck" = "1.6.0"
+
+[tasks.generate]
+description = "Generate protobuf, gRPC, gateway, OpenAPI, and database code"
+run = ["buf generate", "sqlc generate"]
+
+[tasks.format]
+description = "Format protobuf and Go source"
+run = ["buf format -w proto", "go fmt ./..."]
+
+[tasks.run]
+description = "Run the gRPC and HTTP server"
+run = "go run ./cmd/server"
+
+[tasks.dev]
+description = "Run the server with Air hot reload"
+run = "air"
+interactive = true
+
+[tasks."debug-grpc"]
+description = "Open the Evans gRPC REPL"
+run = 'evans --host "${GRPC_HOST:-localhost}" --port "${GRPC_PORT:-8080}" --reflection repl'
+interactive = true
+
+[tasks."debug-grpc-list"]
+description = "List reflected gRPC services with Evans"
+run = 'evans --host "${GRPC_HOST:-localhost}" --port "${GRPC_PORT:-8080}" --reflection cli list'
+
+[tasks."db-status"]
+description = "Show the goose migration status"
+run = 'goose -dir db/migrations sqlite3 "${DATABASE_URL:-grpc-demo.db}" status'
+
+[tasks.test]
+description = "Run tests with the race detector"
+run = "go test -race ./..."
+
+[tasks.lint]
+description = "Run protobuf and Go linters"
+run = ["buf lint", "golangci-lint run"]
+
+[tasks.vuln]
+description = "Scan reachable Go code for known vulnerabilities"
+run = "govulncheck ./..."
+
+[tasks.verify]
+description = "Generate code and run all local CI checks"
+depends = ["generate"]
+run = [
+  "buf format --diff --exit-code proto",
+  "buf lint",
+  "buf build",
+  "golangci-lint run",
+  "go test -race ./...",
+  "govulncheck ./...",
+  "go vet ./...",
+]
+
+[tasks.ci]
+description = "Alias for the complete verification workflow"
+depends = ["verify"]

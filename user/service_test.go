@@ -2,10 +2,14 @@ package user_test
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"io"
 	"net"
+	"net/url"
 	"testing"
 
+	"github.com/9Ashwin/grpc-buf-demo/db"
 	userv1 "github.com/9Ashwin/grpc-buf-demo/gen/go/demo/user/v1"
 	"github.com/9Ashwin/grpc-buf-demo/user"
 	"google.golang.org/grpc"
@@ -16,7 +20,8 @@ import (
 )
 
 func TestUserService(t *testing.T) {
-	client := newTestClient(t)
+	database := newTestDatabase(t)
+	client := newTestClient(t, database)
 	ctx := t.Context()
 
 	if _, err := client.CreateUser(ctx, &userv1.CreateUserRequest{Name: "Ada", Email: "not-an-email"}); status.Code(err) != codes.InvalidArgument {
@@ -29,6 +34,13 @@ func TestUserService(t *testing.T) {
 	}
 	if created.GetUser().GetId() != "user-001" {
 		t.Fatalf("CreateUser() id = %q, want %q", created.GetUser().GetId(), "user-001")
+	}
+	if _, err := client.CreateUser(ctx, &userv1.CreateUserRequest{Name: "Ada", Email: "ada@example.com"}); status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("CreateUser(duplicate) code = %v, want %v", status.Code(err), codes.AlreadyExists)
+	}
+	second, err := client.CreateUser(ctx, &userv1.CreateUserRequest{Name: "Grace", Email: "grace@example.com"})
+	if err != nil {
+		t.Fatalf("CreateUser(second) error = %v", err)
 	}
 
 	got, err := client.GetUser(ctx, &userv1.GetUserRequest{Id: created.GetUser().GetId()})
@@ -43,8 +55,15 @@ func TestUserService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListUsers() error = %v", err)
 	}
-	if list.GetPage().GetTotalSize() != 1 || len(list.GetUsers()) != 1 {
-		t.Fatalf("ListUsers() = %+v, want one user", list)
+	if list.GetPage().GetTotalSize() != 2 || list.GetPage().GetNextPageToken() != "1" || len(list.GetUsers()) != 1 {
+		t.Fatalf("ListUsers() = %+v, want first of two users", list)
+	}
+	next, err := client.ListUsers(ctx, &userv1.ListUsersRequest{PageSize: 1, PageToken: list.GetPage().GetNextPageToken()})
+	if err != nil {
+		t.Fatalf("ListUsers(next) error = %v", err)
+	}
+	if len(next.GetUsers()) != 1 || next.GetUsers()[0].GetId() != second.GetUser().GetId() || next.GetPage().GetNextPageToken() != "" {
+		t.Fatalf("ListUsers(next) = %+v, want second user and no next page", next)
 	}
 
 	stream, err := client.WatchUsers(ctx, &userv1.WatchUsersRequest{})
@@ -58,17 +77,35 @@ func TestUserService(t *testing.T) {
 	if streamed.GetUser().GetId() != created.GetUser().GetId() {
 		t.Fatalf("WatchUsers().Recv() id = %q, want %q", streamed.GetUser().GetId(), created.GetUser().GetId())
 	}
-	if _, err := stream.Recv(); err != io.EOF {
+	streamed, err = stream.Recv()
+	if err != nil {
+		t.Fatalf("WatchUsers().Recv(second) error = %v", err)
+	}
+	if streamed.GetUser().GetId() != second.GetUser().GetId() {
+		t.Fatalf("WatchUsers().Recv(second) id = %q, want %q", streamed.GetUser().GetId(), second.GetUser().GetId())
+	}
+	if _, err := stream.Recv(); !errors.Is(err, io.EOF) {
 		t.Fatalf("WatchUsers().Recv() final error = %v, want EOF", err)
 	}
 }
 
-func newTestClient(t *testing.T) userv1.UserServiceClient {
+func newTestDatabase(t *testing.T) *sql.DB {
+	t.Helper()
+
+	database, err := db.Open(t.Context(), "file:"+url.QueryEscape(t.Name())+"?mode=memory&cache=shared")
+	if err != nil {
+		t.Fatalf("db.Open() error = %v", err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	return database
+}
+
+func newTestClient(t *testing.T, database *sql.DB) userv1.UserServiceClient {
 	t.Helper()
 
 	listener := bufconn.Listen(1024 * 1024)
 	server := grpc.NewServer()
-	userv1.RegisterUserServiceServer(server, user.NewService())
+	userv1.RegisterUserServiceServer(server, user.NewService(database))
 	go func() {
 		if err := server.Serve(listener); err != nil {
 			t.Errorf("Serve() error = %v", err)

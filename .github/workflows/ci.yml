@@ -26,7 +26,7 @@ jobs:
           pr_comment: false
       - name: Generate code
         run: buf generate
-      - name: Check generated code is current
+      - name: Check generated protobuf code is current
         run: git diff --exit-code -- "gen"
 
   go:
@@ -37,5 +37,36 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: "1.31.1"
+      - name: Generate database code
+        run: sqlc generate
+      - name: Check generated code is current
+        run: git diff --exit-code -- "db"
       - name: Test
         run: go test -race "./..."
+        env:
+          RUN_CONTAINER_TESTS: "1"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+
+  vulnerability:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golang/govulncheck-action@v1
