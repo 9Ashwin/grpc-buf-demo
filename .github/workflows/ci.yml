@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  protobuf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: bufbuild/buf-action@v1
+        with:
+          version: "1.71.0"
+          lint: true
+          format: true
+          breaking: ${{ github.event_name == 'pull_request' }}
+          push: false
+          archive: false
+          pr_comment: false
+      - name: Generate code
+        run: buf generate
+      - name: Check generated code is current
+        run: git diff --exit-code -- "gen"
+
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test -race "./..."

@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package demo.user.v1;
+
+import "buf/validate/validate.proto";
+import "demo/common/v1/pagination.proto";
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
+    option (google.api.http) = {
+      post: "/v1/users"
+      body: "*"
+    };
+  }
+
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {get: "/v1/users/{id}"};
+  }
+
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {get: "/v1/users"};
+  }
+
+  rpc WatchUsers(WatchUsersRequest) returns (stream WatchUsersResponse);
+}
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message CreateUserRequest {
+  string name = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string = {
+      min_len: 1
+      max_len: 100
+    },
+    (google.api.field_behavior) = REQUIRED
+  ];
+  string email = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.email = true,
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message CreateUserResponse {
+  User user = 1;
+}
+
+message GetUserRequest {
+  string id = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (google.api.field_behavior) = REQUIRED
+  ];
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message ListUsersRequest {
+  int32 page_size = 1 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 100
+  }];
+  string page_token = 2;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  demo.common.v1.PageInfo page = 2;
+}
+
+message WatchUsersRequest {}
+
+message WatchUsersResponse {
+  User user = 1;
+}
